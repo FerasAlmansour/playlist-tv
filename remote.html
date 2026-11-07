@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>التحكم بالشاشة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d11;
+    --surface: #17171d;
+    --surface-2: #202028;
+    --line: rgba(255,255,255,.08);
+    --text: #f4f2ee;
+    --muted: #9b978f;
+    --accent: #ff7a45;
+    --accent-2: #ffb347;
+    --danger: #ff5c5c;
+    --radius: 16px;
+    --tabs-h: 64px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif; }
+  body { min-height: 100dvh; padding-bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom)); overflow-x: hidden; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+  input { font: inherit; }
+  svg { display: block; }
+  .ico { width: 22px; height: 22px; fill: currentColor; }
+
+  header {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: 12px;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+    background: rgba(13,13,17,.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding: 5px 10px; border-radius: 99px; background: var(--surface); }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+  .status.on i { background: #3ddc84; box-shadow: 0 0 0 3px rgba(61,220,132,.2); }
+  .icon-btn { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0; }
+  .icon-btn:active { background: var(--surface-2); }
+
+  main { padding: 16px; max-width: 560px; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* ---------- يعمل الآن ---------- */
+  .art { position: relative; aspect-ratio: 16/9; border-radius: 20px; overflow: hidden; background: var(--surface) center/cover no-repeat; box-shadow: 0 20px 50px -20px rgba(255,122,69,.35); }
+  .art.empty { display: grid; place-items: center; color: var(--muted); box-shadow: none; border: 1px dashed var(--line); }
+  .np-meta { margin: 18px 2px 4px; }
+  .np-list { font-size: 13px; color: var(--accent-2); font-weight: 500; }
+  .np-title { font-size: 20px; font-weight: 600; line-height: 1.4; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .np-author { font-size: 14px; color: var(--muted); margin-top: 2px; }
+
+  .seek { margin: 18px 0 6px; direction: ltr; }
+  .seek-track { position: relative; height: 28px; display: flex; align-items: center; touch-action: none; }
+  .seek-track::before { content: ''; position: absolute; left: 0; right: 0; height: 5px; border-radius: 9px; background: var(--surface-2); }
+  .seek-fill { position: absolute; left: 0; height: 5px; border-radius: 9px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); width: 0; }
+  .seek-knob { position: absolute; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #fff; left: 0; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  .seek-times { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .controls { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 18px; direction: ltr; }
+  .ctl { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; color: var(--text); }
+  .ctl:active { background: var(--surface-2); }
+  .ctl .ico { width: 30px; height: 30px; }
+  .ctl.small .ico { width: 22px; height: 22px; }
+  .ctl.toggle { color: var(--muted); position: relative; }
+  .ctl.toggle.on { color: var(--accent); }
+  .ctl.toggle .badge { position: absolute; bottom: 9px; right: 11px; font-size: 9px; font-weight: 700; }
+  .play { width: 74px; height: 74px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #1a0d05; display: grid; place-items: center; box-shadow: 0 10px 30px -8px rgba(255,122,69,.6); }
+  .play:active { transform: scale(.95); }
+  .play .ico { width: 34px; height: 34px; }
+
+  .volume { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border-radius: var(--radius); direction: ltr; }
+  .volume input { flex: 1; accent-color: var(--accent); height: 28px; }
+  .volume .val { width: 32px; text-align: center; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .quick button { padding: 12px 6px; background: var(--surface); border-radius: 14px; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .quick button:active { background: var(--surface-2); color: var(--text); }
+
+  .section-title { font-size: 15px; font-weight: 600; margin: 26px 2px 10px; display: flex; align-items: center; justify-content: space-between; }
+  .section-title small { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+  /* ---------- عناصر القوائم ---------- */
+  .row { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 14px; position: relative; }
+  .row:active { background: var(--surface); }
+  .row.current { background: var(--surface); }
+  .row.current .r-title { color: var(--accent-2); }
+  .r-thumb { width: 84px; aspect-ratio: 16/9; border-radius: 9px; background: var(--surface-2) center/cover no-repeat; flex-shrink: 0; position: relative; }
+  .r-thumb .eq { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.45); border-radius: 9px; }
+  .r-body { flex: 1; min-width: 0; }
+  .r-title { font-size: 14px; font-weight: 500; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .r-sub { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .pl-card { display: flex; align-items: center; gap: 14px; padding: 14px; background: var(--surface); border-radius: var(--radius); margin-bottom: 10px; }
+  .pl-cover { width: 64px; height: 64px; border-radius: 12px; flex-shrink: 0; background: var(--surface-2); display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; }
+  .pl-cover span { background: center/cover no-repeat; }
+  .pl-cover.one { grid-template-columns: 1fr; }
+  .pl-cover.none { display: grid; place-items: center; color: var(--muted); }
+  .pl-name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pl-count { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .pl-play { width: 46px; height: 46px; border-radius: 50%; background: var(--accent); color: #1a0d05; display: grid; place-items: center; flex-shrink: 0; }
+  .pl-play:disabled { opacity: .3; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 18px; border-radius: 14px; font-weight: 600; font-size: 15px; }
+  .btn-primary { background: var(--accent); color: #1a0d05; }
+  .btn-ghost { background: var(--surface); }
+  .btn-danger { background: rgba(255,92,92,.12); color: var(--danger); }
+  .btn-block { width: 100%; }
+  .btn:disabled { opacity: .5; }
+
+  .add-box { display: flex; gap: 8px; margin-bottom: 8px; }
+  .field { flex: 1; min-width: 0; height: 48px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--text); outline: none; direction: ltr; text-align: left; }
+  .field:focus { border-color: var(--accent); }
+  .field.rtl { direction: rtl; text-align: right; }
+  .hint { font-size: 12px; color: var(--muted); margin: 0 2px 16px; }
+
+  .pl-head { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; }
+  .pl-head h2 { margin: 0; font-size: 20px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pl-actions { display: flex; gap: 8px; margin-bottom: 18px; }
+  .pl-actions .btn { flex: 1; }
+
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; line-height: 1.8; }
+  .empty svg { width: 44px; height: 44px; margin: 0 auto 10px; fill: var(--surface-2); }
+
+  /* ---------- شريط صغير ---------- */
+  .mini { position: fixed; left: 8px; right: 8px; bottom: calc(var(--tabs-h) + 8px + env(safe-area-inset-bottom)); max-width: 544px; margin: 0 auto; display: none; align-items: center; gap: 10px; padding: 8px; padding-left: 4px; border-radius: 16px; background: var(--surface-2); box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 6; }
+  .mini.show { display: flex; }
+  .mini .r-thumb { width: 64px; }
+  .mini-prog { position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; direction: ltr; }
+  .mini-prog i { display: block; height: 100%; background: var(--accent); width: 0; }
+  body.has-mini { padding-bottom: calc(var(--tabs-h) + 90px + env(safe-area-inset-bottom)); }
+
+  nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; height: calc(var(--tabs-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); display: flex; background: rgba(13,13,17,.94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid var(--line); }
+  nav.tabs button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12px; color: var(--muted); }
+  nav.tabs button.active { color: var(--accent); }
+
+  /* ---------- نوافذ ---------- */
+  .sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 20; display: none; align-items: flex-end; justify-content: center; }
+  .sheet-bg.show { display: flex; }
+  .sheet { width: 100%; max-width: 560px; background: var(--surface); border-radius: 22px 22px 0 0; padding: 10px 16px calc(18px + env(safe-area-inset-bottom)); animation: up .22s ease-out; }
+  @keyframes up { from { transform: translateY(40px); opacity: 0; } }
+  .sheet .grab { width: 40px; height: 4px; border-radius: 4px; background: var(--surface-2); margin: 0 auto 14px; }
+  .sheet h3 { margin: 0 0 14px; font-size: 17px; }
+  .sheet .stack { display: flex; flex-direction: column; gap: 8px; }
+  .menu-item { display: flex; align-items: center; gap: 12px; padding: 14px 10px; border-radius: 12px; font-size: 15px; width: 100%; text-align: right; }
+  .menu-item:active { background: var(--surface-2); }
+  .menu-item.danger { color: var(--danger); }
+
+  .toast { position: fixed; top: calc(70px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%) translateY(-10px); background: var(--surface-2); padding: 10px 18px; border-radius: 99px; font-size: 14px; opacity: 0; transition: .25s; z-index: 30; pointer-events: none; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+  .spin { width: 18px; height: 18px; border: 2px solid rgba(0,0,0,.25); border-top-color: #1a0d05; border-radius: 50%; animation: sp .7s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="icon-btn" id="backBtn" style="display:none" aria-label="رجوع"><svg class="ico" viewBox="0 0 24 24"><path d="M8.6 5.6 10 4.2l7.8 7.8-7.8 7.8-1.4-1.4 6.4-6.4z"/></svg></button>
+  <h1 id="title">شاشة الأغاني</h1>
+  <div class="status" id="tvStatus"><i></i><span>الشاشة</span></div>
+</header>
+
+<main>
+  <!-- يعمل الآن -->
+  <section class="view active" id="v-now">
+    <div class="art empty" id="npArt"><span>لا يوجد تشغيل حالياً</span></div>
+    <div class="np-meta">
+      <div class="np-list" id="npList"></div>
+      <div class="np-title" id="npTitle">اختر قائمة من تبويب «القوائم»</div>
+      <div class="np-author" id="npAuthor"></div>
+    </div>
+
+    <div class="seek">
+      <div class="seek-track" id="seek"><div class="seek-fill" id="seekFill"></div><div class="seek-knob" id="seekKnob"></div></div>
+      <div class="seek-times"><span id="tPos">0:00</span><span id="tDur">0:00</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="ctl small toggle" data-cmd="shuffle" id="btnShuffle" aria-label="عشوائي"><svg class="ico" viewBox="0 0 24 24"><path d="M10.6 9.2 5.4 4 4 5.4l5.2 5.2zM14.5 4l2 2L4 18.6 5.4 20 17.9 7.5l2.1 2V4zm.3 9.4-1.4 1.4 3.1 3.1-2 2.1H20v-5.5l-2 2z"/></svg></button>
+      <button class="ctl" data-cmd="prev" aria-label="السابق"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+      <button class="play" data-cmd="toggle" id="btnPlay" aria-label="تشغيل"></button>
+      <button class="ctl" data-cmd="next" aria-label="التالي"><svg class="ico" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6zM16 6v12h2V6z"/></svg></button>
+      <button class="ctl small toggle" data-cmd="repeat" id="btnRepeat" aria-label="تكرار"><svg class="ico" viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/></svg><span class="badge" id="repeatBadge"></span></button>
+    </div>
+
+    <div class="volume">
+      <button class="icon-btn" data-cmd="mute" id="btnMute" aria-label="كتم"></button>
+      <input type="range" min="0" max="100" id="vol" aria-label="الصوت">
+      <span class="val" id="volVal">80</span>
+    </div>
+    <div class="quick">
+      <button data-cmd="seekBy" data-by="-15"><svg class="ico" viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6zm.5-6 8.5 6V6z"/></svg>‎-15 ث</button>
+      <button data-cmd="stop"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>إيقاف</button>
+      <button data-cmd="seekBy" data-by="15"><svg class="ico" viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6zm9-12v12l8.5-6z"/></svg>‎+15 ث</button>
+    </div>
+    <div class="volume" style="margin-top:10px">
+      <span class="icon-btn" aria-hidden="true" title="هامش الشاشة"><svg class="ico" viewBox="0 0 24 24"><path d="M3 3h18v18H3zm2 2v14h14V5zm3 3h8v8H8z"/></svg></span>
+      <input type="range" min="0" max="50" step="1" id="margin" aria-label="الهامش الأسود حول الشاشة">
+      <span class="val" id="marginVal">25%</span>
+    </div>
+
+    <div id="upNextWrap" style="display:none">
+      <div class="section-title"><span id="upNextTitle">في القائمة</span><small id="upNextCount"></small></div>
+      <div id="upNext"></div>
+    </div>
+  </section>
+
+  <!-- القوائم -->
+  <section class="view" id="v-lists">
+    <div id="plList"></div>
+    <button class="btn btn-ghost btn-block" id="newList"><svg class="ico" viewBox="0 0 24 24"><path d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>قائمة جديدة</button>
+  </section>
+
+  <!-- قائمة واحدة -->
+  <section class="view" id="v-list">
+    <div class="pl-actions">
+      <button class="btn btn-primary" id="plPlayAll"><svg class="ico" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>تشغيل الكل</button>
+      <button class="btn btn-ghost" id="plMore"><svg class="ico" viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>خيارات</button>
+    </div>
+    <form class="add-box" id="addForm">
+      <input class="field" id="addUrl" type="url" inputmode="url" placeholder="https://youtu.be/…" autocomplete="off" required>
+      <button class="btn btn-primary" id="addBtn" type="submit">إضافة</button>
+    </form>
+    <p class="hint">الصق رابط فيديو من يوتيوب. يمكنك لصق عدة روابط مرة واحدة.</p>
+    <div id="items"></div>
+  </section>
+</main>
+
+<div class="mini" id="mini">
+  <div class="r-thumb" id="miniThumb"></div>
+  <div class="r-body" id="miniBody"><div class="r-title" id="miniTitle"></div><div class="r-sub" id="miniSub"></div></div>
+  <button class="icon-btn" data-cmd="toggle" id="miniPlay"></button>
+  <button class="icon-btn" data-cmd="next"><svg class="ico" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6zM16 6v12h2V6z"/></svg></button>
+  <div class="mini-prog"><i id="miniProg"></i></div>
+</div>
+
+<nav class="tabs">
+  <button class="active" data-tab="now"><svg class="ico" viewBox="0 0 24 24"><path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18zM10 7.5v7l6-3.5z"/></svg>يعمل الآن</button>
+  <button data-tab="lists"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h12v2H3zm0 4h12v2H3zm0 4h8v2H3zm14-4v6.2A3 3 0 1 0 19 19v-7h3v-2z"/></svg>القوائم</button>
+</nav>
+
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/core.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const ICON = {
+  play: '<svg class="ico" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>',
+  pause: '<svg class="ico" viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
+  vol: '<svg class="ico" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>',
+  mute: '<svg class="ico" viewBox="0 0 24 24"><path d="M16.5 12A4.5 4.5 0 0 0 14 8v2.2l2.4 2.4a4.6 4.6 0 0 0 .1-.6zM19 12a7 7 0 0 1-.5 2.6l1.5 1.5A9 9 0 0 0 14 3.2v2.1A7 7 0 0 1 19 12zM4.3 3 3 4.3 7.7 9H3v6h4l5 5v-6.7l4.3 4.3a7 7 0 0 1-2.3 1.1v2.1a9 9 0 0 0 3.7-1.8l2 2 1.3-1.3zM12 4 9.9 6.1 12 8.2z"/></svg>',
+  dots: '<svg class="ico" viewBox="0 0 24 24"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>',
+  up: '<svg class="ico" viewBox="0 0 24 24"><path d="m12 8-6 6 1.4 1.4 4.6-4.6 4.6 4.6L18 14z"/></svg>',
+  down: '<svg class="ico" viewBox="0 0 24 24"><path d="M16.6 8.6 12 13.2 7.4 8.6 6 10l6 6 6-6z"/></svg>',
+  trash: '<svg class="ico" viewBox="0 0 24 24"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/></svg>',
+  edit: '<svg class="ico" viewBox="0 0 24 24"><path d="M3 17.2V21h3.8L17.8 9.9 14 6.1zM20.7 7a1 1 0 0 0 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8L19 8.9z"/></svg>',
+  eq: '<svg class="ico" viewBox="0 0 24 24" style="fill:#ffb347"><path d="M4 18h3v-8H4zm6.5 0h3V6h-3zM17 18h3v-5h-3z"/></svg>',
+  music: '<svg viewBox="0 0 24 24"><path d="M12 3v10.6A4 4 0 1 0 14 17V7h4V3z"/></svg>',
+};
+
+let snap = null;
+let tab = 'now';
+let openListId = null;
+let seeking = false;
+let volDragging = false;
+let progressBase = { position: 0, duration: 0, at: 0 };
+
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const thumb = (v) => `https://i.ytimg.com/vi/${v}/mqdefault.jpg`;
+const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+const count = (n) => n === 0 ? 'فارغة' : n === 1 ? 'مقطع واحد' : n === 2 ? 'مقطعان' : n <= 10 ? n + ' مقاطع' : n + ' مقطع';
+
+// المفتاح السري يأتي من رمز QR على الشاشة: remote.html?k=XXXX، ويُحفظ على الموبايل
+const KEY = (() => {
+  const k = new URLSearchParams(location.search).get('k');
+  try { if (k) localStorage.setItem('ptv.key', k); return k || localStorage.getItem('ptv.key') || ''; } catch { return k || ''; }
+})();
+const DB_URL = (() => {
+  const p = new URLSearchParams(location.search).get('db'); // للتجربة المحلية فقط
+  return p && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(p) ? p : PTV_CONFIG.databaseURL;
+})();
+const db = new RTDB(DB_URL);
+const ROOT = 'screens/' + KEY;
+
+// عناوين المقاطع: noembed يسمح بالطلب من المتصفح (يوتيوب نفسه لا يسمح). إن فشل تملؤها الشاشة لاحقاً.
+async function fetchMeta(videoId) {
+  try {
+    const ctrl = new AbortController(); setTimeout(() => ctrl.abort(), 6000);
+    const r = await fetch('https://noembed.com/embed?url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + videoId), { signal: ctrl.signal });
+    const j = await r.json();
+    return j.error ? {} : { title: j.title, author: j.author_name };
+  } catch { return {}; }
+}
+
+// ينفّذ العملية محلياً فوراً (الواجهة لا تنتظر) ثم يكتبها في Firebase
+async function api(action, body) {
+  if (!snap) throw new Error('لم يتم الاتصال بعد');
+  let metas = null;
+  if (action === 'it_add') {
+    const ids = PtvCore.parseLinks(body.url);
+    if (!ids.length) throw new Error('الرابط غير صالح — الصق رابط يوتيوب');
+    const list = await Promise.all(ids.map(fetchMeta));
+    metas = {}; ids.forEach((id, i) => { metas[id] = list[i]; });
+  }
+  const r = PtvCore.apply(snap, action, body, metas);
+  receive(Object.assign(r.data, { tv: snap.tv }));
+  await db.update(ROOT, r.patch);
+  return r.extra;
+}
+const cmd = (action, extra = {}) => api('cmd', { action, ...extra }).catch((e) => toast(e.message));
+
+let toastT;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
+
+function current() {
+  if (!snap?.state.playlistId) return null;
+  const list = snap.playlists.find((p) => p.id === snap.state.playlistId);
+  const item = list?.items[snap.state.index];
+  return item ? { list, item } : null;
+}
+
+// ---------- التنقّل ----------
+function go(t, listId) {
+  tab = t; openListId = listId ?? null;
+  document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+  $('v-' + (t === 'list' ? 'list' : t)).classList.add('active');
+  document.querySelectorAll('nav.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === (t === 'list' ? 'lists' : t)));
+  $('backBtn').style.display = t === 'list' ? '' : 'none';
+  if (t === 'list') history.replaceState(null, '', '#list=' + listId);
+  else history.replaceState(null, '', t === 'lists' ? '#lists' : '#');
+  render();
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('nav.tabs button').forEach((b) => b.onclick = () => go(b.dataset.tab));
+$('backBtn').onclick = () => go('lists');
+
+// ---------- العرض ----------
+function render() {
+  if (!snap) return;
+  const s = snap.state;
+  const c = current();
+
+  $('tvStatus').classList.toggle('on', snap.tvOnline);
+  $('tvStatus').querySelector('span').textContent = snap.tvOnline ? 'الشاشة متصلة' : 'الشاشة غير متصلة';
+
+  // العنوان
+  if (tab === 'list') {
+    const l = snap.playlists.find((p) => p.id === openListId);
+    if (!l) return go('lists');
+    $('title').textContent = l.name;
+  } else $('title').textContent = tab === 'lists' ? 'قوائم التشغيل' : 'شاشة الأغاني';
+
+  // يعمل الآن
+  const art = $('npArt');
+  if (c) {
+    art.classList.remove('empty'); art.innerHTML = '';
+    art.style.backgroundImage = `url(https://i.ytimg.com/vi/${c.item.videoId}/hqdefault.jpg)`;
+    $('npList').textContent = `${c.list.name} · ${s.index + 1} من ${c.list.items.length}`;
+    $('npTitle').textContent = c.item.title;
+    $('npAuthor').textContent = c.item.author || '';
+  } else {
+    art.classList.add('empty'); art.style.backgroundImage = ''; art.innerHTML = '<span>لا يوجد تشغيل حالياً</span>';
+    $('npList').textContent = '';
+    $('npTitle').textContent = snap.playlists.some((p) => p.items.length) ? 'اختر قائمة من تبويب «القوائم»' : 'ابدأ بإنشاء قائمة وإضافة روابط يوتيوب';
+    $('npAuthor').textContent = '';
+  }
+  $('btnPlay').innerHTML = s.playing ? ICON.pause : ICON.play;
+  $('miniPlay').innerHTML = s.playing ? ICON.pause : ICON.play;
+  $('btnShuffle').classList.toggle('on', s.shuffle);
+  $('btnRepeat').classList.toggle('on', s.repeat !== 'off');
+  $('repeatBadge').textContent = s.repeat === 'one' ? '1' : '';
+  $('btnMute').innerHTML = s.muted ? ICON.mute : ICON.vol;
+  if (!volDragging) { $('vol').value = s.volume; $('volVal').textContent = s.muted ? '—' : s.volume; }
+  if (!marginDragging) { $('margin').value = s.margin ?? 0; $('marginVal').textContent = (s.margin ?? 0) + '%'; }
+
+  // التالي في القائمة
+  if (c) {
+    $('upNextWrap').style.display = '';
+    $('upNextTitle').textContent = c.list.name;
+    $('upNextCount').textContent = count(c.list.items.length);
+    $('upNext').innerHTML = c.list.items.map((it, i) => itemRow(it, i, c.list, true)).join('');
+  } else $('upNextWrap').style.display = 'none';
+
+  // القوائم
+  if (!snap.playlists.length) {
+    $('plList').innerHTML = `<div class="empty">${ICON.music}لا توجد قوائم بعد.<br>أنشئ قائمة مثل «أغاني الصباح» أو «أناشيد الأطفال».</div>`;
+  } else {
+    $('plList').innerHTML = snap.playlists.map((p) => {
+      const t = p.items.slice(0, 4);
+      const cover = !t.length ? `<div class="pl-cover none">${ICON.music.replace('<svg', '<svg width="26" height="26" style="fill:currentColor"')}</div>`
+        : t.length < 4 ? `<div class="pl-cover one"><span style="background-image:url(${thumb(t[0].videoId)})"></span></div>`
+        : `<div class="pl-cover">${t.map((x) => `<span style="background-image:url(${thumb(x.videoId)})"></span>`).join('')}</div>`;
+      const live = s.playlistId === p.id && s.playing;
+      return `<div class="pl-card" data-open="${p.id}">${cover}
+        <div class="r-body"><div class="pl-name">${esc(p.name)}</div><div class="pl-count">${live ? '<span style="color:var(--accent-2)">يعمل الآن · </span>' : ''}${count(p.items.length)}</div></div>
+        <button class="pl-play" data-playlist="${p.id}" ${p.items.length ? '' : 'disabled'} aria-label="تشغيل">${ICON.play}</button></div>`;
+    }).join('');
+  }
+
+  // قائمة مفتوحة
+  if (tab === 'list') {
+    const l = snap.playlists.find((p) => p.id === openListId);
+    $('plPlayAll').disabled = !l.items.length;
+    $('items').innerHTML = l.items.length ? l.items.map((it, i) => itemRow(it, i, l, false)).join('')
+      : `<div class="empty">${ICON.music}القائمة فارغة.<br>افتح يوتيوب، اضغط «مشاركة» ← «نسخ الرابط»، ثم الصقه هنا.</div>`;
+  }
+
+  // الشريط الصغير
+  const showMini = !!c && tab !== 'now';
+  $('mini').classList.toggle('show', showMini);
+  document.body.classList.toggle('has-mini', showMini);
+  if (c) {
+    $('miniThumb').style.backgroundImage = `url(${thumb(c.item.videoId)})`;
+    $('miniTitle').textContent = c.item.title;
+    $('miniSub').textContent = c.list.name;
+  }
+  renderProgress();
+}
+
+function itemRow(it, i, list, compact) {
+  const isCur = snap.state.playlistId === list.id && snap.state.index === i;
+  return `<div class="row ${isCur ? 'current' : ''}" data-play="${list.id}" data-index="${i}">
+    <div class="r-thumb" style="background-image:url(${thumb(it.videoId)})">${isCur && snap.state.playing ? `<div class="eq">${ICON.eq}</div>` : ''}</div>
+    <div class="r-body"><div class="r-title">${esc(it.title)}</div><div class="r-sub">${esc(it.author || '')}</div></div>
+    ${compact ? '' : `<button class="icon-btn" data-item-menu="${it.id}" aria-label="خيارات">${ICON.dots}</button>`}
+  </div>`;
+}
+
+function livePosition() {
+  const p = progressBase;
+  if (!p.duration) return 0;
+  const extra = snap?.state.playing ? (Date.now() - p.at) / 1000 : 0;
+  return Math.min(p.duration, p.position + extra);
+}
+function renderProgress() {
+  if (seeking) return;
+  const dur = progressBase.duration, pos = current() ? livePosition() : 0;
+  const pct = dur ? pos / dur * 100 : 0;
+  $('seekFill').style.width = pct + '%';
+  $('seekKnob').style.left = pct + '%';
+  $('miniProg').style.width = pct + '%';
+  $('tPos').textContent = fmt(pos);
+  $('tDur').textContent = fmt(current() ? dur : 0);
+}
+setInterval(renderProgress, 500);
+
+// ---------- الأحداث ----------
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-cmd],[data-playlist],[data-item-menu],[data-play],[data-open]');
+  if (!el) return;
+  if (el.dataset.cmd) {
+    if (el.dataset.cmd === 'stop' && !current()) return;
+    return cmd(el.dataset.cmd, el.dataset.by ? { by: Number(el.dataset.by) } : {});
+  }
+  if (el.dataset.playlist) { e.stopPropagation(); cmd('playAt', { playlistId: el.dataset.playlist, index: 0 }); toast('بدأ التشغيل على الشاشة'); return; }
+  if (el.dataset.itemMenu) { e.stopPropagation(); return itemMenu(el.dataset.itemMenu); }
+  if (el.dataset.play) { cmd('playAt', { playlistId: el.dataset.play, index: Number(el.dataset.index) }); return; }
+  if (el.dataset.open) return go('list', el.dataset.open);
+});
+$('miniBody').onclick = () => go('now');
+$('miniThumb').onclick = () => go('now');
+
+// الصوت
+// الهامش الأسود
+let marginDragging = false, marginT;
+const marginEl = $('margin');
+marginEl.addEventListener('input', () => {
+  marginDragging = true; $('marginVal').textContent = marginEl.value + '%';
+  clearTimeout(marginT); marginT = setTimeout(() => cmd('margin', { value: Number(marginEl.value) }), 150);
+});
+marginEl.addEventListener('change', () => { marginDragging = false; cmd('margin', { value: Number(marginEl.value) }); });
+
+const vol = $('vol');
+let volT;
+vol.addEventListener('input', () => {
+  volDragging = true; $('volVal').textContent = vol.value;
+  clearTimeout(volT); volT = setTimeout(() => cmd('volume', { value: Number(vol.value) }), 120);
+});
+vol.addEventListener('change', () => { volDragging = false; cmd('volume', { value: Number(vol.value) }); });
+
+// شريط التقدّم
+const seekEl = $('seek');
+function seekPct(ev) { const r = seekEl.getBoundingClientRect(); return Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)); }
+seekEl.addEventListener('pointerdown', (ev) => {
+  if (!current() || !progressBase.duration) return;
+  seeking = true; seekEl.setPointerCapture(ev.pointerId); preview(ev);
+});
+seekEl.addEventListener('pointermove', (ev) => seeking && preview(ev));
+seekEl.addEventListener('pointerup', (ev) => {
+  if (!seeking) return;
+  seeking = false;
+  const to = seekPct(ev) * progressBase.duration;
+  progressBase = { ...progressBase, position: to, at: Date.now() };
+  cmd('seek', { to });
+});
+function preview(ev) {
+  const pct = seekPct(ev) * 100;
+  $('seekFill').style.width = pct + '%'; $('seekKnob').style.left = pct + '%';
+  $('tPos').textContent = fmt(pct / 100 * progressBase.duration);
+}
+
+// إضافة روابط
+$('addForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = $('addUrl').value.trim();
+  if (!url) return;
+  const btn = $('addBtn'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span>';
+  try {
+    const r = await api('it_add', { pl: openListId, url });
+    $('addUrl').value = '';
+    toast(r.added > 1 ? `أُضيف ${r.added} مقاطع` : 'تمت الإضافة');
+  } catch (err) { toast(err.message); }
+  btn.disabled = false; btn.textContent = 'إضافة';
+});
+// يقبل اللصق متعدد الأسطر داخل حقل سطر واحد
+$('addUrl').addEventListener('paste', (e) => {
+  const t = (e.clipboardData || window.clipboardData).getData('text');
+  if (/\n/.test(t)) { e.preventDefault(); $('addUrl').value = t.replace(/\s+/g, ' ').trim(); }
+});
+$('addUrl').type = 'text'; // للسماح بعدة روابط
+
+$('plPlayAll').onclick = () => { cmd('playAt', { playlistId: openListId, index: 0 }); toast('بدأ التشغيل على الشاشة'); };
+$('newList').onclick = () => askName('قائمة جديدة', '', 'إنشاء', async (name) => {
+  const p = await api('pl_create', { name });
+  go('list', p.created);
+});
+$('plMore').onclick = () => {
+  const l = snap.playlists.find((p) => p.id === openListId);
+  const i = snap.playlists.indexOf(l);
+  sheet(`<h3>${esc(l.name)}</h3><div class="stack">
+    <button class="menu-item" data-a="rename">${ICON.edit}إعادة التسمية</button>
+    ${i > 0 ? `<button class="menu-item" data-a="up">${ICON.up}نقل للأعلى</button>` : ''}
+    ${i < snap.playlists.length - 1 ? `<button class="menu-item" data-a="down">${ICON.down}نقل للأسفل</button>` : ''}
+    <button class="menu-item danger" data-a="del">${ICON.trash}حذف القائمة</button></div>`, async (a) => {
+    if (a === 'rename') return askName('إعادة التسمية', l.name, 'حفظ', (name) => api('pl_rename', { id: l.id, name }));
+    if (a === 'up' || a === 'down') return api('pl_move', { id: l.id, dir: a === 'up' ? -1 : 1 });
+    if (a === 'del') return confirmSheet(`حذف «${l.name}»؟`, `سيتم حذف ${count(l.items.length)} من القائمة. لا يمكن التراجع.`, async () => { await api('pl_delete', { id: l.id }); go('lists'); toast('تم حذف القائمة'); });
+  });
+};
+
+function itemMenu(itemId) {
+  const l = snap.playlists.find((p) => p.id === openListId);
+  const i = l.items.findIndex((x) => x.id === itemId);
+  const it = l.items[i];
+  sheet(`<h3 style="font-size:15px;line-height:1.5">${esc(it.title)}</h3><div class="stack">
+    <button class="menu-item" data-a="play">${ICON.play}تشغيل الآن</button>
+    <button class="menu-item" data-a="rename">${ICON.edit}تعديل العنوان</button>
+    ${i > 0 ? `<button class="menu-item" data-a="up">${ICON.up}نقل للأعلى</button>` : ''}
+    ${i < l.items.length - 1 ? `<button class="menu-item" data-a="down">${ICON.down}نقل للأسفل</button>` : ''}
+    <button class="menu-item danger" data-a="del">${ICON.trash}حذف من القائمة</button></div>`, async (a) => {
+    const ref = { pl: l.id, id: it.id };
+    if (a === 'play') return cmd('playAt', { playlistId: l.id, index: i });
+    if (a === 'rename') return askName('تعديل العنوان', it.title, 'حفظ', (title) => api('it_rename', { ...ref, title }));
+    if (a === 'up' || a === 'down') return api('it_move', { ...ref, dir: a === 'up' ? -1 : 1 });
+    if (a === 'del') { await api('it_delete', ref); toast('تم الحذف'); }
+  });
+}
+
+// ---------- النوافذ ----------
+function sheet(html, onAction) {
+  $('sheet').innerHTML = '<div class="grab"></div>' + html;
+  $('sheetBg').classList.add('show');
+  $('sheet').onclick = async (e) => {
+    const b = e.target.closest('[data-a]');
+    if (!b) return;
+    closeSheet();
+    try { await onAction(b.dataset.a); } catch (err) { toast(err.message); }
+  };
+}
+function closeSheet() { $('sheetBg').classList.remove('show'); }
+$('sheetBg').addEventListener('click', (e) => { if (e.target.id === 'sheetBg') closeSheet(); });
+
+function askName(title, value, okText, onOk) {
+  $('sheet').innerHTML = `<div class="grab"></div><h3>${esc(title)}</h3>
+    <form id="nameForm" class="stack"><input class="field rtl" id="nameInput" maxlength="150" value="${esc(value)}" placeholder="الاسم" required>
+    <button class="btn btn-primary btn-block" type="submit">${esc(okText)}</button></form>`;
+  $('sheet').onclick = null;
+  $('sheetBg').classList.add('show');
+  const inp = $('nameInput'); setTimeout(() => { inp.focus(); inp.select(); }, 50);
+  $('nameForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const v = inp.value.trim(); if (!v) return;
+    closeSheet();
+    try { await onOk(v); } catch (err) { toast(err.message); }
+  };
+}
+function confirmSheet(title, text, onOk) {
+  sheet(`<h3>${esc(title)}</h3><p style="color:var(--muted);margin:-6px 0 16px;font-size:14px">${esc(text)}</p>
+    <div class="stack"><button class="btn btn-danger btn-block" data-a="ok">حذف</button><button class="btn btn-ghost btn-block" data-a="no">إلغاء</button></div>`,
+    (a) => a === 'ok' && onOk());
+}
+
+// ---------- المزامنة مع Firebase (بث لحظي) ----------
+// الشاشة تكتب tv/lastSeen كل ثانيتين؛ نعتبرها متصلة إذا تغيّرت القيمة خلال آخر 8 ثوانٍ (حسب ساعة الموبايل)
+let lastSeenValue = null, lastSeenLocal = 0, lastProgressSig = '', lastSig = '';
+const tvOnline = () => Date.now() - lastSeenLocal < 8000;
+
+function receive(d) {
+  const pSig = d.progress.position + ':' + d.progress.duration;
+  if (!seeking && pSig !== lastProgressSig) {
+    lastProgressSig = pSig;
+    progressBase = { position: d.progress.position, duration: d.progress.duration, at: Date.now() };
+  }
+  if (d.tv.lastSeen !== lastSeenValue) {
+    if (lastSeenValue !== null) lastSeenLocal = Date.now();
+    lastSeenValue = d.tv.lastSeen;
+  }
+  d.tvOnline = tvOnline();
+  snap = d;
+  const sig = JSON.stringify([d.state, d.playlists, d.tvOnline]);
+  if (sig !== lastSig) { lastSig = sig; render(); }
+}
+
+if (!KEY) {
+  $('tvStatus').querySelector('span').textContent = 'امسح رمز QR من الشاشة';
+} else if (!DB_URL) {
+  $('tvStatus').querySelector('span').textContent = 'قاعدة البيانات غير مضبوطة';
+} else {
+  db.listen(ROOT, (tree) => receive(PtvCore.normalize(tree)), (status) => {
+    if (status === 'denied') toast('قاعدة البيانات رفضت الوصول');
+    if (status !== 'open') { $('tvStatus').classList.remove('on'); $('tvStatus').querySelector('span').textContent = 'جاري الاتصال…'; }
+  });
+  // يحدّث مؤشر اتصال الشاشة حتى لو لم يصل أي تغيير
+  setInterval(() => { if (snap && snap.tvOnline !== tvOnline()) receive(snap); }, 2000);
+}
+
+// فتح من الرابط
+const h = location.hash;
+if (h.startsWith('#list=')) { const id = h.slice(6); const wait = setInterval(() => { if (snap) { clearInterval(wait); snap.playlists.some((p) => p.id === id) ? go('list', id) : go('lists'); } }, 50); }
+else if (h === '#lists') go('lists');
+</script>
+</body>
+</html>

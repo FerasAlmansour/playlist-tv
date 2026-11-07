@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>شاشة الأغاني</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* مكتوب ليتوافق مع متصفحات التلفزيونات القديمة: بدون gap / inset / ?. */
+  :root {
+    --bg: #0a0a0d;
+    --panel: rgba(16, 16, 22, 0.86);
+    --line: rgba(255, 255, 255, 0.10);
+    --text: #f4f2ee;
+    --muted: #a19d96;
+    --accent: #ff7a45;
+    --accent-2: #ffb347;
+  }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: 'IBM Plex Sans Arabic', 'IBM Plex Sans', sans-serif;
+    cursor: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  * { box-sizing: border-box; }
+
+  html, body { background: #000; }
+  /* الهامش الأسود: كل محتوى التطبيق يُصغَّر حول المركز. transform يجعل العناصر fixed بداخله نسبةً إليه */
+  #app {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg);
+    -webkit-transform-origin: 50% 50%; transform-origin: 50% 50%;
+    -webkit-transform: scale(1); transform: scale(1);
+    transition: -webkit-transform .4s; transition: transform .4s;
+  }
+  #stage { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; }
+  #stage iframe, #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+
+  /* ---------- شاشة الانتظار ---------- */
+  #idle {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    display: -webkit-flex; display: flex;
+    -webkit-align-items: center; align-items: center;
+    padding: 0 6vw;
+    background:
+      radial-gradient(60vw 60vw at 85% 15%, rgba(255, 122, 69, 0.18), transparent 60%),
+      radial-gradient(50vw 50vw at 10% 90%, rgba(255, 179, 71, 0.10), transparent 60%),
+      var(--bg);
+    transition: opacity .6s;
+  }
+  #idle.hidden { opacity: 0; pointer-events: none; }
+  .idle-main { -webkit-flex: 1; flex: 1; min-width: 0; }
+  .brand { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-bottom: 3vw; }
+  .brand-mark {
+    width: 4.2vw; height: 4.2vw; border-radius: 1.1vw; margin-left: 1.2vw;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center;
+  }
+  .brand-mark svg { width: 2vw; height: 2vw; }
+  .brand h1 { margin: 0; font-size: 3.4vw; font-weight: 700; letter-spacing: -0.02em; }
+  .idle-sub { font-size: 1.5vw; color: var(--muted); margin: 0 0 2.6vw; font-weight: 400; }
+
+  .lists { display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; margin: 0 -0.6vw; }
+  .list-card {
+    width: 15vw; margin: 0.6vw; padding: 1.3vw 1.4vw;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 1vw;
+  }
+  .list-card .n { font-size: 1.35vw; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-card .c { font-size: 1vw; color: var(--muted); margin-top: .3vw; }
+  .empty-note { font-size: 1.3vw; color: var(--muted); }
+
+  .connect {
+    width: 24vw; margin-right: 5vw; padding: 2vw; text-align: center;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 1.6vw;
+  }
+  .qr { background: #fff; border-radius: 1vw; padding: 1vw; width: 17vw; height: 17vw; margin: 0 auto 1.4vw; }
+  .qr svg, .qr img { width: 100%; height: 100%; display: block; }
+  .connect .t { font-size: 1.4vw; font-weight: 600; margin-bottom: .5vw; }
+  .connect .u { font-size: 1.15vw; color: var(--accent-2); direction: ltr; font-family: 'IBM Plex Sans', monospace; word-break: break-all; }
+
+  /* ---------- شريط المعلومات ---------- */
+  #overlay {
+    position: fixed; left: 3vw; right: 3vw; bottom: 3vw;
+    display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center;
+    padding: 1.4vw 1.6vw; border-radius: 1.4vw;
+    background: var(--panel); border: 1px solid var(--line);
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+    transition: opacity .45s, -webkit-transform .45s; transition: opacity .45s, transform .45s;
+    opacity: 0; -webkit-transform: translateY(2vw); transform: translateY(2vw);
+  }
+  #overlay.show { opacity: 1; -webkit-transform: none; transform: none; }
+  .thumb { width: 11vw; height: 6.2vw; border-radius: .7vw; background: #222 center/cover no-repeat; -webkit-flex-shrink: 0; flex-shrink: 0; margin-left: 1.6vw; }
+  .meta { -webkit-flex: 1; flex: 1; min-width: 0; }
+  .meta .pl { font-size: 1vw; color: var(--accent-2); font-weight: 500; margin-bottom: .2vw; }
+  .meta .ti { font-size: 1.9vw; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.35; }
+  .meta .au { font-size: 1.05vw; color: var(--muted); margin-top: .1vw; }
+  .bar { height: .35vw; background: rgba(255,255,255,.12); border-radius: 1vw; margin-top: 1vw; overflow: hidden; direction: ltr; }
+  .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 1vw; }
+  .times { display: -webkit-flex; display: flex; -webkit-justify-content: space-between; justify-content: space-between; font-size: .95vw; color: var(--muted); margin-top: .4vw; direction: ltr; font-family: 'IBM Plex Sans', sans-serif; }
+  .next { width: 19vw; margin-right: 2vw; padding-right: 2vw; border-right: 1px solid var(--line); -webkit-flex-shrink: 0; flex-shrink: 0; }
+  .next .l { font-size: .95vw; color: var(--muted); margin-bottom: .3vw; }
+  .next .v { font-size: 1.2vw; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---------- مؤشرات ---------- */
+  #pauseBadge {
+    position: fixed; top: 50%; left: 50%; width: 8vw; height: 8vw; margin: -4vw 0 0 -4vw;
+    border-radius: 50%; background: var(--panel); border: 1px solid var(--line);
+    display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center;
+    opacity: 0; transition: opacity .3s;
+  }
+  #pauseBadge.show { opacity: 1; }
+  #pauseBadge svg { width: 3vw; height: 3vw; }
+
+  #toast {
+    position: fixed; top: 3vw; left: 50%; -webkit-transform: translateX(-50%); transform: translateX(-50%);
+    padding: 1vw 2vw; border-radius: 3vw; background: var(--panel); border: 1px solid var(--line);
+    font-size: 1.3vw; opacity: 0; transition: opacity .3s; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
+
+  #conn {
+    position: fixed; top: 2vw; left: 2vw; padding: .6vw 1.2vw; border-radius: 2vw;
+    background: rgba(180, 40, 40, .85); font-size: 1vw; display: none;
+  }
+  #conn.show { display: block; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<div id="stage"><div id="player"></div></div>
+
+<div id="idle">
+  <div class="idle-main">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg></div>
+      <h1>شاشة الأغاني</h1>
+    </div>
+    <p class="idle-sub">اختر قائمة تشغيل من موبايلك وابدأ</p>
+    <div class="lists" id="lists"></div>
+  </div>
+  <div class="connect">
+    <div class="qr" id="qr"></div>
+    <div class="t">امسح الرمز للتحكم</div>
+    <div class="u" id="remoteUrl"></div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div class="thumb" id="ovThumb"></div>
+  <div class="meta">
+    <div class="pl" id="ovList"></div>
+    <div class="ti" id="ovTitle"></div>
+    <div class="au" id="ovAuthor"></div>
+    <div class="bar"><i id="ovBar"></i></div>
+    <div class="times"><span id="ovPos">0:00</span><span id="ovDur">0:00</span></div>
+  </div>
+  <div class="next" id="ovNextWrap">
+    <div class="l">التالي</div>
+    <div class="v" id="ovNext"></div>
+  </div>
+</div>
+
+<div id="pauseBadge"><svg viewBox="0 0 24 24" fill="#fff"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></div>
+<div id="toast"></div>
+<div id="conn">انقطع الاتصال بالخادم… جاري إعادة المحاولة</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/core.js"></script>
+<script>
+(function () {
+  var qs = new URLSearchParams(location.search);
+
+  // مفتاح الشاشة: يأتي من تطبيق التلفزيون (?k=) أو يُولَّد هنا أول مرة ويُحفظ.
+  // كل بيانات هذه الشاشة في Firebase تحت screens/<المفتاح>، ومن لا يعرفه لا يصل إليها.
+  var KEY = qs.get('k') || '';
+  try {
+    if (!KEY) KEY = localStorage.getItem('ptv.key') || '';
+    if (!KEY) KEY = PtvCore.uid(20);
+    localStorage.setItem('ptv.key', KEY);
+  } catch (e) { if (!KEY) KEY = PtvCore.uid(20); }
+
+  // ?db= للتجربة المحلية فقط
+  var dbParam = qs.get('db');
+  var DB_URL = dbParam && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(dbParam) ? dbParam : PTV_CONFIG.databaseURL;
+  var db = new RTDB(DB_URL);
+  var ROOT = 'screens/' + KEY;
+
+  var BASE = location.href.replace(/[?#].*$/, '').replace(/[^\/]*$/, '');
+  var REMOTE_URL = BASE + 'remote.html?k=' + encodeURIComponent(KEY) + (dbParam === DB_URL ? '&db=' + encodeURIComponent(DB_URL) : '');
+
+  var $ = function (id) { return document.getElementById(id); };
+  var snap = null;
+  var player = null, playerReady = false;
+  var loadedKey = null;
+  var overlayTimer = null, toastTimer = null;
+  var errorStreak = 0;
+  var needsUnmute = false;
+  var startWatch = null;
+
+  // ينفّذ الأمر محلياً فوراً ثم يكتبه في Firebase ليصل للموبايل
+  function cmd(action, extra) {
+    if (!snap) return;
+    var b = extra || {}; b.action = action;
+    try {
+      var r = PtvCore.apply(snap, 'cmd', b);
+      receive(r.data);
+      db.update(ROOT, r.patch).catch(function () {});
+    } catch (e) {}
+  }
+  function report(fields) {
+    fields['tv/lastSeen'] = RTDB.TIMESTAMP;
+    return db.update(ROOT, fields).catch(function () {});
+  }
+
+  function fmt(s) {
+    s = Math.max(0, Math.floor(s || 0));
+    var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (ss < 10 ? '0' : '') + ss;
+  }
+  function esc(t) { var d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
+
+  function toast(msg, ms) {
+    var t = $('toast'); t.textContent = msg; t.className = 'show';
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = ''; }, ms || 3500);
+  }
+  function showOverlay(ms) {
+    $('overlay').className = 'show';
+    clearTimeout(overlayTimer);
+    if (ms !== 0) overlayTimer = setTimeout(function () {
+      if (snap && snap.state.playing) $('overlay').className = '';
+    }, ms || 7000);
+  }
+
+  function current() {
+    if (!snap || !snap.state.playlistId) return null;
+    var l = null;
+    for (var i = 0; i < snap.playlists.length; i++) if (snap.playlists[i].id === snap.state.playlistId) l = snap.playlists[i];
+    if (!l || !l.items[snap.state.index]) return null;
+    return { list: l, item: l.items[snap.state.index], next: snap.state.shuffle ? null : l.items[snap.state.index + 1] || (snap.state.repeat === 'all' ? l.items[0] : null) };
+  }
+
+  // ---------- واجهة الانتظار ----------
+  var qrDone = '';
+  function renderIdle() {
+    var html = '';
+    var any = false;
+    snap.playlists.forEach(function (p) {
+      any = true;
+      html += '<div class="list-card"><div class="n">' + esc(p.name) + '</div><div class="c">' + p.items.length + ' مقطع</div></div>';
+    });
+    $('lists').innerHTML = any ? html : '<div class="empty-note">لا توجد قوائم بعد — أنشئ أول قائمة من الموبايل</div>';
+    $('remoteUrl').textContent = REMOTE_URL.replace(/^https?:\/\//, '').replace(/\?.*$/, '');
+    if (qrDone !== REMOTE_URL && window.qrcode) {
+      try {
+        var q = qrcode(0, 'M'); q.addData(REMOTE_URL); q.make();
+        $('qr').innerHTML = q.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+        qrDone = REMOTE_URL;
+      } catch (e) {}
+    }
+  }
+
+  function renderOverlay(c) {
+    $('ovThumb').style.backgroundImage = 'url(https://i.ytimg.com/vi/' + c.item.videoId + '/hqdefault.jpg)';
+    $('ovList').textContent = c.list.name + '  ·  ' + (snap.state.index + 1) + ' / ' + c.list.items.length;
+    $('ovTitle').textContent = c.item.title;
+    $('ovAuthor').textContent = c.item.author || '';
+    if (c.next) { $('ovNextWrap').style.display = ''; $('ovNext').textContent = c.next.title; }
+    else $('ovNextWrap').style.display = 'none';
+  }
+
+  // ---------- تطبيق الحالة ----------
+  var appliedMargin = -1;
+  function applyMargin() {
+    var m = Math.max(0, Math.min(60, Number(snap.state.margin) || 0));
+    if (m === appliedMargin) return;
+    appliedMargin = m;
+    var t = 'scale(' + (1 - m / 100) + ')';
+    $('app').style.webkitTransform = t; $('app').style.transform = t;
+  }
+
+  function apply() {
+    if (!snap) return;
+    applyMargin();
+    var c = current();
+    $('idle').className = c ? 'hidden' : '';
+    if (!c) {
+      renderIdle();
+      $('overlay').className = '';
+      $('pauseBadge').className = '';
+      if (playerReady && loadedKey) { try { player.stopVideo(); } catch (e) {} }
+      loadedKey = null;
+      return;
+    }
+    renderOverlay(c);
+    if (!playerReady) return;
+
+    var key = snap.state.nonce + ':' + c.item.videoId;
+    if (key !== loadedKey) {
+      loadedKey = key;
+      if (snap.state.playing) { player.loadVideoById(c.item.videoId); watchStart(); }
+      else player.cueVideoById(c.item.videoId);
+      showOverlay();
+    } else {
+      var ps = player.getPlayerState();
+      if (snap.state.playing && ps !== 1 && ps !== 3) { player.playVideo(); watchStart(); }
+      if (!snap.state.playing && ps === 1) player.pauseVideo();
+    }
+    if (snap.state.muted || needsUnmute) player.mute(); else player.unMute();
+    player.setVolume(snap.state.volume);
+
+    $('pauseBadge').className = snap.state.playing ? '' : 'show';
+    if (!snap.state.playing) showOverlay(0);
+  }
+
+  // إذا منع المتصفح التشغيل بالصوت، شغّل بدون صوت واطلب ضغطة واحدة
+  function watchStart() {
+    clearTimeout(startWatch);
+    startWatch = setTimeout(function () {
+      if (!snap || !snap.state.playing || !playerReady) return;
+      var ps = player.getPlayerState();
+      if (ps !== 1 && ps !== 3) {
+        needsUnmute = true; player.mute(); player.playVideo();
+        toast('اضغط OK على الريموت لتشغيل الصوت', 8000);
+      }
+    }, 2500);
+  }
+  function userGesture() {
+    if (needsUnmute && playerReady) {
+      needsUnmute = false;
+      if (!snap.state.muted) player.unMute();
+      player.setVolume(snap.state.volume);
+      toast('تم تشغيل الصوت', 1500);
+      return true;
+    }
+    return false;
+  }
+
+  // ---------- مشغّل يوتيوب ----------
+  window.onYouTubeIframeAPIReady = function () {
+    player = new YT.Player('player', {
+      width: '100%', height: '100%',
+      playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, fs: 0, disablekb: 1, enablejsapi: 1, origin: location.origin },
+      events: {
+        onReady: function () { playerReady = true; apply(); },
+        onStateChange: function (e) {
+          if (e.data === 1) { errorStreak = 0; if (snap && !snap.state.playing) player.pauseVideo(); fillTitle(); }
+          if (e.data === 0) cmd('ended');
+        },
+        onError: function (e) {
+          var c = current();
+          var reason = (e.data === 101 || e.data === 150) ? 'صاحب المقطع منع تشغيله خارج يوتيوب' : (e.data === 100 ? 'المقطع محذوف أو خاص' : 'تعذّر تشغيل المقطع');
+          toast(reason + ' — الانتقال للتالي', 4000);
+          report({ 'tv/lastError': { code: e.data, videoId: c ? c.item.videoId : '', at: RTDB.TIMESTAMP } });
+          errorStreak++;
+          if (c && errorStreak < c.list.items.length) setTimeout(function () { cmd('next'); }, 2500);
+        }
+      }
+    });
+  };
+  var tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+
+  // إذا أُضيف مقطع بدون عنوان (تعذّر جلبه من الموبايل)، نأخذه من مشغّل يوتيوب نفسه
+  function fillTitle() {
+    var c = current();
+    if (!c || (c.item.title && c.item.title !== 'مقطع يوتيوب')) return;
+    var vd = {};
+    try { vd = player.getVideoData() || {}; } catch (e) {}
+    if (!vd.title) return;
+    var pi = snap.playlists.indexOf(c.list), ii = snap.state.index;
+    var f = {};
+    f['playlists/' + pi + '/items/' + ii + '/title'] = vd.title;
+    if (vd.author) f['playlists/' + pi + '/items/' + ii + '/author'] = vd.author;
+    db.update(ROOT, f).catch(function () {});
+  }
+
+  // تحديث شريط التقدّم + إبلاغ الخادم
+  var lastReport = 0;
+  setInterval(function () {
+    var pos = 0, dur = 0;
+    if (playerReady && loadedKey) {
+      try { pos = player.getCurrentTime() || 0; dur = player.getDuration() || 0; } catch (e) {}
+      $('ovBar').style.width = dur ? (pos / dur * 100) + '%' : '0';
+      $('ovPos').textContent = fmt(pos); $('ovDur').textContent = fmt(dur);
+    }
+    if (Date.now() - lastReport > 2000 && snap) {
+      lastReport = Date.now();
+      var f = {};
+      // نكتب التقدّم فقط إذا تغيّر، أما lastSeen فدائماً ليعرف الموبايل أن الشاشة متصلة
+      if (pos !== snap.progress.position || dur !== snap.progress.duration) {
+        f.progress = { position: pos, duration: dur };
+        snap.progress = f.progress;
+      }
+      report(f);
+    }
+  }, 500);
+
+  // ---------- المزامنة مع Firebase (بث لحظي) ----------
+  var lastSeekId = null, lastReloadId = null, lastSig = '';
+
+  function receive(d) {
+    var prev = snap;
+    snap = d;
+    var s = d.state;
+    // أوامر لحظية تُرسل كعدّادات: نطبّقها فقط إذا تغيّر العدّاد بعد التحميل
+    if (lastReloadId !== null && s.reloadId !== lastReloadId) { location.reload(); return; }
+    lastReloadId = s.reloadId;
+    if (lastSeekId !== null && s.seek.id !== lastSeekId && playerReady) { player.seekTo(s.seek.to, true); showOverlay(4000); }
+    lastSeekId = s.seek.id;
+    // تحديثات التقدّم تصل كل ثانيتين — لا داعي لإعادة رسم كل شيء معها
+    var sig = JSON.stringify([d.state, d.playlists]);
+    if (sig === lastSig && prev) return;
+    lastSig = sig;
+    apply();
+  }
+
+  if (!DB_URL) {
+    $('conn').textContent = 'لم يُضبط رابط قاعدة البيانات في js/config.js';
+    $('conn').className = 'show';
+  } else {
+    var initialized = false;
+    db.listen(ROOT, function (tree) {
+      $('conn').className = '';
+      // أول تشغيل لهذه الشاشة: أنشئ بياناتها
+      if (!initialized) {
+        initialized = true;
+        if (!tree || !tree.state) {
+          db.update(ROOT, { state: PtvCore.DEFAULT_STATE, 'tv/created': RTDB.TIMESTAMP }).catch(function () {});
+        }
+      }
+      receive(PtvCore.normalize(tree));
+    }, function (status) {
+      if (status === 'denied') { $('conn').textContent = 'قاعدة البيانات رفضت الوصول — راجع قواعد Firebase'; $('conn').className = 'show'; }
+      else if (status === 'error') { $('conn').textContent = 'انقطع الاتصال… جاري إعادة المحاولة'; $('conn').className = 'show'; }
+      else if (status === 'open') $('conn').className = '';
+    });
+  }
+
+  // ---------- ريموت التلفزيون ----------
+  try {
+    var keys = ['MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaStop', 'MediaTrackNext', 'MediaTrackPrevious', 'MediaFastForward', 'MediaRewind', 'ChannelUp', 'ChannelDown'];
+    keys.forEach(function (k) { try { tizen.tvinputdevice.registerKey(k); } catch (e) {} });
+  } catch (e) {}
+
+  // يعيد true إذا تمت معالجة الزر
+  function handleKey(k) {
+    if (userGesture() && k === 13) return true;
+    switch (k) {
+      case 13: case 10252: cmd('toggle'); break;                 // OK / تشغيل-إيقاف
+      case 415: cmd('play'); break;
+      case 19: cmd('pause'); break;
+      case 413: cmd('stop'); break;
+      case 37: case 10233: case 427: cmd('next'); break;          // يسار (RTL) / التالي / قناة+
+      case 39: case 10232: case 428: cmd('prev'); break;          // يمين / السابق / قناة-
+      case 417: cmd('seekBy', { by: 15 }); break;
+      case 412: cmd('seekBy', { by: -15 }); break;
+      case 38: case 40: if (current()) showOverlay(); break;
+      case 10009: // رجوع
+        if ($('overlay').className === 'show' && snap && snap.state.playing) $('overlay').className = '';
+        else { try { tizen.application.getCurrentApplication().hide(); } catch (er) {} }
+        break;
+      default: return false;
+    }
+    return true;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (handleKey(e.keyCode)) e.preventDefault();
+  });
+  document.addEventListener('click', userGesture);
+
+  // أزرار الريموت القادمة من تطبيق Tizen المغلِّف
+  window.addEventListener('message', function (e) {
+    if (e.source !== window.parent || !e.data || e.data.type !== 'key') return;
+    handleKey(e.data.keyCode);
+  });
+})();
+</script>
+</body>
+</html>

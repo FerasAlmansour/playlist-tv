@@ -1,0 +1,12 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "screens": {
+      "$screen": {
+        ".read": "$screen.length >= 20",
+        ".write": "$screen.length >= 20"
+      }
+    }
+  }
+}
